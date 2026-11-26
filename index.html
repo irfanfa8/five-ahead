@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Five Ahead – Math Battle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F3F6FA;
+    --grid: rgba(47, 91, 234, 0.08);
+    --ink: #1B2233;
+    --ink-soft: #5A6378;
+    --p1: #2F5BEA;
+    --p1-tint: #E3EAFE;
+    --p2: #E8572A;
+    --p2-tint: #FDE7DF;
+    --good: #1E9E5A;
+    --bad: #D7263D;
+    --btn: #FFFFFF;
+    --btn-edge: #D5DCE8;
+    --veil: rgba(243, 246, 250, 0.94);
+    color-scheme: light;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #121826;
+      --grid: rgba(140, 165, 255, 0.07);
+      --ink: #E8ECF4;
+      --ink-soft: #9AA4BA;
+      --p1: #6E8FFF;
+      --p1-tint: #1C2648;
+      --p2: #FF8A5C;
+      --p2-tint: #3A2219;
+      --good: #3DD68C;
+      --bad: #FF5C70;
+      --btn: #1B2335;
+      --btn-edge: #2C3650;
+      --veil: rgba(18, 24, 38, 0.95);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #121826;
+    --grid: rgba(140, 165, 255, 0.07);
+    --ink: #E8ECF4;
+    --ink-soft: #9AA4BA;
+    --p1: #6E8FFF;
+    --p1-tint: #1C2648;
+    --p2: #FF8A5C;
+    --p2-tint: #3A2219;
+    --good: #3DD68C;
+    --bad: #FF5C70;
+    --btn: #1B2335;
+    --btn-edge: #2C3650;
+    --veil: rgba(18, 24, 38, 0.95);
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 28px 28px;
+    color: var(--ink);
+    font-family: "Bricolage Grotesque", ui-rounded, "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ---------- Arena: the divider moves toward the trailing player ---------- */
+  .arena {
+    height: 100%;
+    display: flex;
+    flex-direction: row;
+  }
+  .panel {
+    flex: 10 1 0;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(12px, 3vmin, 32px);
+    transition: flex-grow 450ms cubic-bezier(.2,.8,.2,1);
+    overflow: hidden;
+  }
+  .panel.p1 { background: color-mix(in srgb, var(--p1-tint) 70%, transparent); }
+  .panel.p2 { background: color-mix(in srgb, var(--p2-tint) 70%, transparent); }
+  .panel.p1 + .panel.p2 { border-left: 4px solid var(--ink); }
+
+  .panel-inner {
+    width: 100%;
+    max-width: 460px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(10px, 2.2vmin, 22px);
+  }
+
+  /* Portrait: face-to-face on one device, top player sees their half the right way up */
+  @media (orientation: portrait) {
+    .arena { flex-direction: column-reverse; }
+    .panel.p1 + .panel.p2 { border-left: 0; border-bottom: 4px solid var(--ink); }
+    .panel.p2 .panel-inner { transform: rotate(180deg); }
+  }
+
+  .phead {
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .pname {
+    font-weight: 600;
+    font-size: clamp(1rem, 2.6vmin, 1.3rem);
+  }
+  .p1 .pname { color: var(--p1); }
+  .p2 .pname { color: var(--p2); }
+  .score {
+    font-weight: 800;
+    font-size: clamp(1.6rem, 5vmin, 2.6rem);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .score.bump { animation: bump 300ms ease-out; }
+  @keyframes bump { 40% { transform: scale(1.25); } }
+
+  .pips {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  .pip {
+    height: 10px;
+    border-radius: 5px;
+    border: 2px solid var(--btn-edge);
+    transition: background-color 250ms, border-color 250ms;
+  }
+  .p1 .pip.on { background: var(--p1); border-color: var(--p1); }
+  .p2 .pip.on { background: var(--p2); border-color: var(--p2); }
+
+  .question {
+    font-weight: 800;
+    font-size: clamp(2.4rem, 11vmin, 5.5rem);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    white-space: nowrap;
+    padding: 0.1em 0;
+  }
+  .question .eq { color: var(--ink-soft); font-weight: 600; }
+
+  .choices {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(8px, 1.6vmin, 14px);
+  }
+  .choice {
+    font: inherit;
+    font-weight: 800;
+    font-size: clamp(1.5rem, 5.5vmin, 2.4rem);
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+    background: var(--btn);
+    border: 3px solid var(--btn-edge);
+    border-bottom-width: 6px;
+    border-radius: 14px;
+    padding: clamp(10px, 2.4vmin, 20px) 8px;
+    cursor: pointer;
+    position: relative;
+    transition: transform 80ms, border-color 120ms, background-color 120ms;
+  }
+  .choice:active:not(:disabled) { transform: translateY(3px); border-bottom-width: 3px; }
+  .p1 .choice:hover:not(:disabled) { border-color: var(--p1); }
+  .p2 .choice:hover:not(:disabled) { border-color: var(--p2); }
+  .choice:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+  .choice:disabled { cursor: default; }
+  .choice.right { background: var(--good); border-color: var(--good); color: #fff; }
+  .choice.wrong { background: var(--bad); border-color: var(--bad); color: #fff; }
+  .key {
+    position: absolute;
+    top: 6px;
+    left: 9px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    display: none;
+  }
+  @media (hover: hover) and (pointer: fine) { .key { display: block; } }
+
+  .flash-good { animation: good 450ms ease-out; }
+  @keyframes good { 0% { box-shadow: inset 0 0 0 0 var(--good); } 30% { box-shadow: inset 0 0 0 10px var(--good); } 100% { box-shadow: inset 0 0 0 0 var(--good); } }
+  .shake .panel-inner { animation: shake 380ms ease-in-out; }
+  @media (orientation: portrait) { .p2.shake .panel-inner { animation-name: shake-flipped; } }
+  @keyframes shake { 20%,60% { transform: translateX(-10px); } 40%,80% { transform: translateX(10px); } }
+  @keyframes shake-flipped { 0%,100% { transform: rotate(180deg); } 20%,60% { transform: rotate(180deg) translateX(-10px); } 40%,80% { transform: rotate(180deg) translateX(10px); } }
+
+  /* ---------- Overlays ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--veil);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    padding-top: calc(24px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    z-index: 20;
+    overflow-y: auto;
+  }
+  .overlay[hidden] { display: none; }
+  .card {
+    max-width: 440px;
+    width: 100%;
+    text-align: center;
+  }
+  .title {
+    font-weight: 800;
+    font-size: clamp(3rem, 14vmin, 5.5rem);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    margin: 0 0 18px;
+  }
+  .title .t1 { color: var(--p1); display: block; }
+  .title .t2 { color: var(--p2); display: block; }
+  .lede {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    line-height: 1.5;
+    margin: 0 auto 24px;
+    max-width: 34ch;
+  }
+  .levels {
+    display: inline-flex;
+    border: 3px solid var(--ink);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 22px;
+  }
+  .levels label { position: relative; }
+  .levels input { position: absolute; opacity: 0; pointer-events: none; }
+  .levels span {
+    display: block;
+    padding: 10px 18px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .levels label + label span { border-left: 3px solid var(--ink); }
+  .levels input:checked + span { background: var(--ink); color: var(--paper); }
+  .levels input:focus-visible + span { outline: 3px solid var(--p1); outline-offset: -6px; }
+  .level-note {
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+    margin: -10px 0 22px;
+    min-height: 1.4em;
+  }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+  .btn {
+    font: inherit;
+    font-weight: 800;
+    font-size: 1.2rem;
+    padding: 14px 28px;
+    border-radius: 14px;
+    border: 3px solid var(--ink);
+    border-bottom-width: 6px;
+    background: var(--ink);
+    color: var(--paper);
+    cursor: pointer;
+  }
+  .btn.ghost { background: transparent; color: var(--ink); }
+  .btn:active { transform: translateY(3px); border-bottom-width: 3px; }
+  .btn:focus-visible { outline: 3px solid var(--p1); outline-offset: 3px; }
+  .keys-hint {
+    margin-top: 20px;
+    color: var(--ink-soft);
+    font-size: 0.9rem;
+    display: none;
+  }
+  @media (hover: hover) and (pointer: fine) { .keys-hint { display: block; } }
+
+  .winner {
+    font-weight: 800;
+    font-size: clamp(2.6rem, 11vmin, 4.5rem);
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+    margin: 0 0 12px;
+  }
+  .final {
+    color: var(--ink-soft);
+    font-size: 1.15rem;
+    margin: 0 0 26px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .countdown {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+    pointer-events: none;
+    font-weight: 800;
+    font-size: clamp(6rem, 30vmin, 14rem);
+    color: var(--ink);
+  }
+  .countdown[hidden] { display: none; }
+  .countdown span { animation: pop 700ms ease-out both; }
+  @keyframes pop { 0% { transform: scale(1.6); opacity: 0; } 30% { transform: scale(1); opacity: 1; } 100% { opacity: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .panel { transition: none; }
+    .shake .panel-inner, .score.bump, .flash-good, .countdown span { animation: none !important; }
+  }
+
+  /* ---------- Class mode (phones as controllers) ---------- */
+  .card.wide { max-width: 780px; }
+  .card.wide .title { font-size: clamp(2.6rem, 10vmin, 4.5rem); margin-bottom: 12px; }
+  .card.wide .lede { margin-bottom: 18px; max-width: 52ch; }
+  .card.wide .levels { margin-bottom: 18px; }
+  .join {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 0 0 20px;
+  }
+  @media (max-width: 520px) { .join { grid-template-columns: 1fr; } }
+  .slot {
+    background: var(--btn);
+    border: 3px solid var(--btn-edge);
+    border-radius: 16px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .slot.p1 { border-color: var(--p1); }
+  .slot.p2 { border-color: var(--p2); }
+  .slot h3 { margin: 0; font-size: 1.15rem; font-weight: 800; }
+  .slot.p1 h3 { color: var(--p1); }
+  .slot.p2 h3 { color: var(--p2); }
+  .qr {
+    width: min(190px, 100%);
+    aspect-ratio: 1;
+    background: #fff;
+    border-radius: 10px;
+    padding: 6px;
+    display: grid;
+    place-items: center;
+    transition: opacity 200ms;
+  }
+  .qr img { width: 100%; height: auto; display: block; image-rendering: pixelated; }
+  .slot.connected .qr { opacity: 0.25; }
+  .status { font-weight: 600; color: var(--ink-soft); font-size: 0.95rem; }
+  .slot.connected .status { color: var(--good); }
+  .joinlink {
+    font-size: 0.72rem;
+    color: var(--ink-soft);
+    word-break: break-all;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .netnote {
+    color: var(--bad);
+    font-size: 0.95rem;
+    line-height: 1.45;
+    margin: 0 0 18px;
+  }
+  .netnote:empty { display: none; }
+  .netnote a { color: inherit; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; border-bottom-width: 6px; }
+  .start-note { color: var(--ink-soft); font-size: 0.9rem; margin: 10px 0 0; min-height: 1.3em; }
+
+  .tag { display: none; font-size: 0.8rem; font-weight: 600; margin-left: 8px; }
+  body.remote .tag { display: inline; }
+  .tag.on { color: var(--good); }
+  .tag.off { color: var(--bad); }
+
+  /* On the class screen the buttons only show what the players see */
+  body.remote .arena .choice { pointer-events: none; }
+  body.remote .arena .key { display: none !important; }
+  @media (orientation: portrait) {
+    body.remote .arena { flex-direction: column; }
+    body.remote .panel.p1 + .panel.p2 { border-bottom: 0; border-top: 4px solid var(--ink); }
+    body.remote .panel.p2 .panel-inner { transform: none; }
+    body.remote .p2.shake .panel-inner { animation-name: shake; }
+  }
+
+  /* ---------- Phone controller ---------- */
+  .panel.phone {
+    position: fixed;
+    inset: 0;
+    padding: 20px 16px;
+    padding-top: calc(20px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+  .panel.phone[hidden] { display: none; }
+  .panel.phone .panel-inner { max-width: 520px; transform: none; gap: 18px; }
+  .panel.phone.shake .panel-inner { animation-name: shake; }
+  .panel.phone .question { font-size: clamp(2.4rem, 14vw, 5rem); }
+  .panel.phone .choices { gap: 12px; }
+  .panel.phone .choice { font-size: clamp(1.8rem, 9vw, 2.6rem); padding: 24px 8px; }
+  .panel.phone .key { display: none; }
+  .choice.picked { border-color: var(--ink); }
+  .opp { color: var(--ink-soft); font-size: 1rem; font-weight: 600; margin: -6px 0 0; }
+  .phone-msg .winner { font-size: clamp(2.2rem, 11vw, 3.6rem); }
+  .phone-msg .lede { margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<main class="arena" id="arena" aria-label="Game board">
+  <section class="panel p1" id="panel0" aria-label="Player 1">
+    <div class="panel-inner">
+      <div class="phead">
+        <span class="pname">Player 1<span class="tag"></span></span>
+        <span class="score" aria-live="polite">0</span>
+      </div>
+      <div class="pips" aria-hidden="true"></div>
+      <div class="question" aria-live="polite">&nbsp;</div>
+      <div class="choices"></div>
+    </div>
+  </section>
+  <section class="panel p2" id="panel1" aria-label="Player 2">
+    <div class="panel-inner">
+      <div class="phead">
+        <span class="pname">Player 2<span class="tag"></span></span>
+        <span class="score" aria-live="polite">0</span>
+      </div>
+      <div class="pips" aria-hidden="true"></div>
+      <div class="question" aria-live="polite">&nbsp;</div>
+      <div class="choices"></div>
+    </div>
+  </section>
+</main>
+
+<div class="overlay" id="startScreen">
+  <div class="card wide">
+    <h1 class="title"><span class="t1">Five</span><span class="t2">Ahead</span></h1>
+    <p class="lede">Each player gets their own questions. A right answer adds a point, a wrong one takes a point away. First to get five points ahead wins.</p>
+    <div class="levels" role="radiogroup" aria-label="Difficulty">
+      <label><input type="radio" name="level" value="easy"><span>Easy</span></label>
+      <label><input type="radio" name="level" value="medium" checked><span>Medium</span></label>
+      <label><input type="radio" name="level" value="hard"><span>Hard</span></label>
+    </div>
+    <p class="level-note" id="levelNote"></p>
+    <p class="netnote" id="netNote"></p>
+    <div class="join" id="joinGrid">
+      <div class="slot p1" id="slot0">
+        <h3>Player 1</h3>
+        <div class="qr"></div>
+        <div class="status">Scan with a phone</div>
+        <div class="joinlink"></div>
+      </div>
+      <div class="slot p2" id="slot1">
+        <h3>Player 2</h3>
+        <div class="qr"></div>
+        <div class="status">Scan with a phone</div>
+        <div class="joinlink"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="startBtn" disabled>Start game</button>
+      <button class="btn ghost" id="localBtn">Play on this device</button>
+    </div>
+    <p class="start-note" id="startNote">Waiting for both players to scan</p>
+    <p class="keys-hint">On this device, Player 1 uses keys 1 2 3 4 and Player 2 uses 7 8 9 0.</p>
+  </div>
+</div>
+
+<div class="overlay" id="winScreen" hidden>
+  <div class="card">
+    <h2 class="winner" id="winnerText">Player 1 wins</h2>
+    <p class="final" id="finalScore"></p>
+    <div class="actions">
+      <button class="btn" id="againBtn">Play again</button>
+      <button class="btn ghost" id="levelBtn">New players or level</button>
+    </div>
+  </div>
+</div>
+
+<!-- Phone controller (shown when opened from a QR code) -->
+<section class="panel phone" id="phoneView" hidden aria-label="Your controller">
+  <div class="panel-inner">
+    <div class="phead">
+      <span class="pname" id="phoneName">Player 1</span>
+      <span class="score" aria-live="polite">0</span>
+    </div>
+    <div class="pips" aria-hidden="true"></div>
+    <p class="opp" id="oppLine">&nbsp;</p>
+    <div class="question" aria-live="polite">&nbsp;</div>
+    <div class="choices"></div>
+  </div>
+</section>
+
+<div class="overlay phone-msg" id="phoneMsg" hidden>
+  <div class="card">
+    <h2 class="winner" id="phoneMsgTitle">Connecting…</h2>
+    <p class="lede" id="phoneMsgBody"></p>
+  </div>
+</div>
+
+<div class="countdown" id="countdown" hidden></div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(function () {
+  const WIN_LEAD = 5;
+  const WRONG_LOCK_MS = 800;
+  const P1_KEYS = ["1", "2", "3", "4"];
+  const P2_KEYS = ["7", "8", "9", "0"];
+  const NAMES = ["Player 1", "Player 2"];
+  const ROOM_PREFIX = "fiveahead-room-";
+  const HEARTBEAT_MS = 2500;
+  const OFFLINE_AFTER_MS = 8000;
+
+  const LEVEL_NOTES = {
+    easy: "Adding and subtracting up to 20",
+    medium: "Adding, subtracting and times tables to 10",
+    hard: "All four operations, bigger numbers"
+  };
+
+  // ---------- Shared helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const pick = (arr) => arr[rand(0, arr.length - 1)];
+
+  function makeQuestion(level) {
+    let a, b, op, ans;
+    if (level === "easy") {
+      op = pick(["+", "−"]);
+      if (op === "+") { a = rand(1, 10); b = rand(1, 10); ans = a + b; }
+      else { a = rand(2, 20); b = rand(1, a); ans = a - b; }
+    } else if (level === "medium") {
+      op = pick(["+", "−", "×"]);
+      if (op === "+") { a = rand(10, 50); b = rand(5, 49); ans = a + b; }
+      else if (op === "−") { a = rand(15, 60); b = rand(5, a); ans = a - b; }
+      else { a = rand(2, 10); b = rand(2, 10); ans = a * b; }
+    } else {
+      op = pick(["+", "−", "×", "÷"]);
+      if (op === "+") { a = rand(25, 99); b = rand(25, 99); ans = a + b; }
+      else if (op === "−") { a = rand(40, 150); b = rand(15, a); ans = a - b; }
+      else if (op === "×") { a = rand(3, 12); b = rand(3, 12); ans = a * b; }
+      else { b = rand(2, 12); ans = rand(2, 12); a = b * ans; }
+    }
+    return { text: a + " " + op + " " + b, answer: ans, options: makeOptions(ans, op) };
+  }
+
+  function makeOptions(ans, op) {
+    const set = new Set([ans]);
+    const spread = [1, 2, 3, 10];
+    let guard = 0;
+    while (set.size < 4 && guard++ < 100) {
+      let off = pick(spread) * (Math.random() < 0.5 ? -1 : 1);
+      if (op === "×" && Math.random() < 0.4) off = pick([-1, 1]) * rand(3, 12);
+      const c = ans + off;
+      if (c >= 0) set.add(c);
+    }
+    let n = ans + 4;
+    while (set.size < 4) set.add(n++);
+    const arr = Array.from(set);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = rand(0, i);
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function restartAnim(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+  }
+
+  function countdown(done) {
+    const el = $("countdown");
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) { done(); return; }
+    const steps = ["3", "2", "1"];
+    el.hidden = false;
+    let i = 0;
+    const tick = () => {
+      if (i >= steps.length) { el.hidden = true; el.innerHTML = ""; done(); return; }
+      el.innerHTML = "<span>" + steps[i] + "</span>";
+      i++;
+      setTimeout(tick, 650);
+    };
+    tick();
+  }
+
+  function buildPips(container) {
+    for (let i = 0; i < WIN_LEAD; i++) {
+      const d = document.createElement("span");
+      d.className = "pip";
+      container.appendChild(d);
+    }
+    return Array.from(container.children);
+  }
+
+  function buildButtons(container, keys, onPick) {
+    return keys.map((k, i) => {
+      const b = document.createElement("button");
+      b.className = "choice";
+      b.type = "button";
+      b.innerHTML = '<span class="key">' + k + '</span><span class="val"></span>';
+      b.addEventListener("pointerdown", (e) => { e.preventDefault(); onPick(i); });
+      b.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(i); }
+      });
+      container.appendChild(b);
+      return b;
+    });
+  }
+
+  function storageGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function storageSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } }
+  function randomCode() {
+    const chars = "abcdefghjkmnpqrstuvwxyz23456789";
+    let s = "";
+    for (let i = 0; i < 6; i++) s += chars[rand(0, chars.length - 1)];
+    return s;
+  }
+
+  const params = new URLSearchParams(location.search);
+  const joinRoom = params.get("join");
+  if (joinRoom) runPlayer(joinRoom, params.get("p") === "2" ? 1 : 0);
+  else runHost();
+
+  // =====================================================================
+  // CLASS SCREEN (host): runs the game, shows both players to the class
+  // =====================================================================
+  function runHost() {
+    $("phoneView").remove();
+    $("phoneMsg").remove();
+
+    const state = {
+      level: "medium",
+      mode: "remote",        // "remote" = phones answer, "local" = one device
+      phase: "lobby",        // lobby | countdown | play | over
+      scores: [0, 0],
+      questions: [null, null],
+      locked: [false, false],
+      qid: 0,
+      overMsg: null
+    };
+    const conns = [null, null];
+    const lastSeen = [0, 0];
+
+    const panels = [$("panel0"), $("panel1")];
+    const ui = panels.map((panel, p) => ({
+      panel,
+      score: panel.querySelector(".score"),
+      question: panel.querySelector(".question"),
+      tag: panel.querySelector(".tag"),
+      pips: buildPips(panel.querySelector(".pips")),
+      buttons: buildButtons(panel.querySelector(".choices"), p === 0 ? P1_KEYS : P2_KEYS, (i) => {
+        if (state.mode === "local") answer(p, i);
+      })
+    }));
+
+    // ---------- Messaging ----------
+    function send(p, msg) {
+      if (state.mode !== "remote" && msg.t !== "hello" && msg.t !== "lobby") return;
+      const c = conns[p];
+      if (!c || !c.open) return;
+      try { c.send(msg); } catch (e) { /* ignore */ }
+    }
+    const sendAll = (msg) => { send(0, msg); send(1, msg); };
+    const scoreMsg = () => ({ t: "score", scores: state.scores.slice() });
+    const qMsg = (p) => {
+      const q = state.questions[p];
+      return { t: "q", id: q.id, text: q.text, options: q.options };
+    };
+
+    function isOnline(p) {
+      return !!(conns[p] && conns[p].open && Date.now() - lastSeen[p] < OFFLINE_AFTER_MS);
+    }
+
+    function refreshPresence() {
+      [0, 1].forEach((p) => {
+        const on = isOnline(p);
+        const slot = $("slot" + p);
+        slot.classList.toggle("connected", on);
+        slot.querySelector(".status").textContent = on ? "✓ Phone connected" : "Scan with a phone";
+        ui[p].tag.textContent = on ? "● phone" : "○ phone offline";
+        ui[p].tag.className = "tag " + (on ? "on" : "off");
+      });
+      const both = isOnline(0) && isOnline(1);
+      $("startBtn").disabled = !both;
+      $("startNote").textContent = both ? "Both players are in. Ready!" : "Waiting for both players to scan";
+    }
+    setInterval(refreshPresence, 1000);
+
+    function syncPlayer(p) {
+      send(p, { t: "hello", p });
+      if (state.mode !== "remote") return;
+      send(p, scoreMsg());
+      if (state.phase === "play" && !state.locked[p] && state.questions[p]) send(p, qMsg(p));
+      else if (state.phase === "over" && state.overMsg) send(p, state.overMsg);
+      else if (state.phase === "countdown") send(p, { t: "ready" });
+    }
+
+    function onConnection(conn) {
+      const p = conn.metadata && conn.metadata.p === 1 ? 1 : 0;
+      conn.on("open", () => {
+        const old = conns[p];
+        conns[p] = conn;
+        lastSeen[p] = Date.now();
+        if (old && old !== conn) {
+          try { old.send({ t: "kicked" }); } catch (e) { /* ignore */ }
+          setTimeout(() => { try { old.close(); } catch (e) { /* ignore */ } }, 300);
+        }
+        refreshPresence();
+        syncPlayer(p);
+      });
+      conn.on("data", (m) => {
+        if (conns[p] !== conn || !m) return;
+        lastSeen[p] = Date.now();
+        if (m.t === "ans" && state.mode === "remote") answer(p, m.i, m.id);
+      });
+      conn.on("close", () => {
+        if (conns[p] === conn) { conns[p] = null; refreshPresence(); }
+      });
+      conn.on("error", () => {});
+    }
+
+    // ---------- Room + QR codes ----------
+    let room = storageGet("fiveahead-room");
+    if (!room || !/^[a-z0-9]{6}$/.test(room)) { room = randomCode(); storageSet("fiveahead-room", room); }
+    const netNote = $("netNote");
+    const isFile = location.protocol === "file:";
+
+    function joinUrl(p) {
+      return location.origin + location.pathname + "?join=" + room + "&p=" + (p + 1);
+    }
+
+    function renderQRs() {
+      [0, 1].forEach((p) => {
+        const slot = $("slot" + p);
+        const url = joinUrl(p);
+        slot.querySelector(".joinlink").textContent = url;
+        if (window.qrcode) {
+          const qr = window.qrcode(0, "M");
+          qr.addData(url);
+          qr.make();
+          slot.querySelector(".qr").innerHTML =
+            '<img alt="QR code to join as ' + NAMES[p] + '" src="' + qr.createDataURL(6, 2) + '">';
+        }
+      });
+    }
+
+    let peer = null;
+    let idRetries = 0;
+    function startPeer() {
+      if (!window.Peer) {
+        netNote.textContent = "Couldn't load the connection library. Check the internet connection and reload.";
+        return;
+      }
+      peer = new window.Peer(ROOM_PREFIX + room);
+      peer.on("open", () => { idRetries = 0; if (!isFile) netNote.textContent = ""; });
+      peer.on("connection", onConnection);
+      peer.on("disconnected", () => { try { peer.reconnect(); } catch (e) { /* ignore */ } });
+      peer.on("error", (err) => {
+        if (err.type === "unavailable-id") {
+          // The room is still held (e.g. the page was just reloaded, or is open in another tab).
+          try { peer.destroy(); } catch (e) { /* ignore */ }
+          if (++idRetries > 3) {
+            room = randomCode();
+            storageSet("fiveahead-room", room);
+            idRetries = 0;
+            renderQRs();
+          }
+          netNote.textContent = "Setting up the room…";
+          setTimeout(startPeer, 2500);
+        } else if (["network", "server-error", "socket-error", "socket-closed", "browser-incompatible"].includes(err.type)) {
+          netNote.textContent = "Can't reach the connection server. Check the internet connection, then reload this page.";
+        }
+      });
+    }
+
+    if (isFile) {
+      netNote.innerHTML = "Phones can't open a file that is only on this computer. To play with phones, put this file online first " +
+        "(for example drag the <b>five-ahead</b> folder onto <a href=\"https://app.netlify.com/drop\" target=\"_blank\" rel=\"noopener\">app.netlify.com/drop</a>) " +
+        "and open the game from that web address. You can still play on this device.";
+      $("joinGrid").hidden = true;
+      $("startBtn").hidden = true;
+      $("startNote").hidden = true;
+    } else {
+      renderQRs();
+      startPeer();
+    }
+
+    // ---------- Rendering ----------
+    function showQuestion(p) {
+      const q = makeQuestion(state.level);
+      q.id = ++state.qid;
+      state.questions[p] = q;
+      state.locked[p] = false;
+      ui[p].question.innerHTML = q.text + ' <span class="eq">=</span> ?';
+      ui[p].buttons.forEach((b, i) => {
+        b.classList.remove("right", "wrong");
+        b.disabled = state.mode !== "local";
+        b.querySelector(".val").textContent = q.options[i];
+        b.setAttribute("aria-label", "Answer " + q.options[i]);
+      });
+      send(p, qMsg(p));
+    }
+
+    function renderBoard() {
+      const lead = state.scores[0] - state.scores[1];
+      const shift = 1.25 * lead;
+      panels[0].style.flexGrow = String(10 + shift);
+      panels[1].style.flexGrow = String(10 - shift);
+      [0, 1].forEach((p) => {
+        ui[p].score.textContent = state.scores[p];
+        const myLead = p === 0 ? lead : -lead;
+        ui[p].pips.forEach((pip, i) => pip.classList.toggle("on", i < myLead));
+      });
+      sendAll(scoreMsg());
+    }
+
+    // ---------- Game flow ----------
+    function answer(p, i, qid) {
+      if (state.phase !== "play" || state.locked[p]) return;
+      const q = state.questions[p];
+      if (!q || (qid !== undefined && qid !== q.id) || !(i >= 0 && i < 4)) return;
+      const chosen = q.options[i];
+      if (chosen === q.answer) {
+        state.scores[p] += 1;
+        send(p, { t: "res", ok: true, chosen: i });
+        restartAnim(ui[p].panel, "flash-good");
+        restartAnim(ui[p].score, "bump");
+        renderBoard();
+        if (checkWin()) return;
+        showQuestion(p);
+      } else {
+        state.scores[p] -= 1;
+        state.locked[p] = true;
+        send(p, { t: "res", ok: false, chosen: i, correct: q.options.indexOf(q.answer) });
+        ui[p].buttons.forEach((b, j) => {
+          b.disabled = true;
+          if (j === i) b.classList.add("wrong");
+          if (q.options[j] === q.answer) b.classList.add("right");
+        });
+        restartAnim(ui[p].panel, "shake");
+        restartAnim(ui[p].score, "bump");
+        renderBoard();
+        if (checkWin()) return;
+        const runId = state.runId;
+        setTimeout(() => { if (state.phase === "play" && state.runId === runId) showQuestion(p); }, WRONG_LOCK_MS);
+      }
+    }
+
+    function checkWin() {
+      const lead = state.scores[0] - state.scores[1];
+      if (Math.abs(lead) < WIN_LEAD) return false;
+      state.phase = "over";
+      const w = lead > 0 ? 0 : 1;
+      state.overMsg = { t: "over", winner: w, scores: state.scores.slice() };
+      sendAll(state.overMsg);
+      const winnerText = $("winnerText");
+      winnerText.textContent = NAMES[w] + " wins";
+      winnerText.style.color = w === 0 ? "var(--p1)" : "var(--p2)";
+      $("finalScore").textContent = "Final score " + state.scores[0] + " to " + state.scores[1];
+      ui.forEach((u) => u.buttons.forEach((b) => (b.disabled = true)));
+      setTimeout(() => {
+        $("winScreen").hidden = false;
+        $("againBtn").focus();
+      }, 550);
+      return true;
+    }
+
+    function startGame(mode) {
+      if (mode) state.mode = mode;
+      document.body.classList.toggle("remote", state.mode === "remote");
+      state.scores = [0, 0];
+      state.questions = [null, null];
+      state.locked = [false, false];
+      state.overMsg = null;
+      state.phase = "countdown";
+      state.runId = (state.runId || 0) + 1;
+      const runId = state.runId;
+      $("startScreen").hidden = true;
+      $("winScreen").hidden = true;
+      renderBoard();
+      sendAll({ t: "countdown" });
+      ui.forEach((u) => {
+        u.question.innerHTML = "&nbsp;";
+        u.buttons.forEach((b) => { b.disabled = true; b.classList.remove("right", "wrong"); b.querySelector(".val").textContent = ""; });
+      });
+      countdown(() => {
+        if (state.runId !== runId) return;
+        state.phase = "play";
+        showQuestion(0);
+        showQuestion(1);
+      });
+    }
+
+    function backToLobby() {
+      state.phase = "lobby";
+      state.mode = "remote";
+      document.body.classList.remove("remote");
+      sendAll({ t: "lobby" });
+      $("winScreen").hidden = true;
+      $("startScreen").hidden = false;
+      refreshPresence();
+    }
+
+    // ---------- Controls ----------
+    const levelNote = $("levelNote");
+    document.querySelectorAll('input[name="level"]').forEach((inp) => inp.addEventListener("change", () => {
+      state.level = inp.value;
+      levelNote.textContent = LEVEL_NOTES[state.level];
+    }));
+    levelNote.textContent = LEVEL_NOTES[state.level];
+
+    $("startBtn").addEventListener("click", () => startGame("remote"));
+    $("localBtn").addEventListener("click", () => startGame("local"));
+    $("againBtn").addEventListener("click", () => startGame());
+    $("levelBtn").addEventListener("click", backToLobby);
+
+    document.addEventListener("keydown", (e) => {
+      if (e.repeat || state.phase !== "play" || state.mode !== "local") return;
+      const i1 = P1_KEYS.indexOf(e.key);
+      if (i1 !== -1) { answer(0, i1); return; }
+      const i2 = P2_KEYS.indexOf(e.key);
+      if (i2 !== -1) answer(1, i2);
+    });
+
+    renderBoard();
+    refreshPresence();
+  }
+
+  // =====================================================================
+  // PHONE (player): shows only this player's questions and buttons
+  // =====================================================================
+  function runPlayer(room, p) {
+    ["arena", "startScreen", "winScreen"].forEach((id) => $(id).remove());
+    const view = $("phoneView");
+    view.hidden = false;
+    view.classList.add(p === 0 ? "p1" : "p2");
+    $("phoneName").textContent = NAMES[p];
+    document.title = NAMES[p] + " – Five Ahead";
+
+    const scoreEl = view.querySelector(".score");
+    const questionEl = view.querySelector(".question");
+    const oppLine = $("oppLine");
+    const pips = buildPips(view.querySelector(".pips"));
+    const buttons = buildButtons(view.querySelector(".choices"), ["", "", "", ""], tap);
+    const msgEl = $("phoneMsg");
+    const color = p === 0 ? "var(--p1)" : "var(--p2)";
+
+    let peer = null;
+    let conn = null;
+    let kicked = false;
+    let current = null;
+    let answered = true;
+    let retryTimer = null;
+    let wakeLock = null;
+
+    function showMsg(title, body, titleColor) {
+      $("phoneMsgTitle").textContent = title;
+      $("phoneMsgTitle").style.color = titleColor || "";
+      $("phoneMsgBody").textContent = body || "";
+      msgEl.hidden = false;
+    }
+    const hideMsg = () => { msgEl.hidden = true; };
+
+    function clearBoard() {
+      current = null;
+      answered = true;
+      questionEl.innerHTML = "&nbsp;";
+      buttons.forEach((b) => {
+        b.disabled = true;
+        b.classList.remove("right", "wrong", "picked");
+        b.querySelector(".val").textContent = "";
+      });
+    }
+
+    function renderScores(scores) {
+      const mine = scores[p], theirs = scores[1 - p];
+      if (Number(scoreEl.textContent) !== mine) restartAnim(scoreEl, "bump");
+      scoreEl.textContent = mine;
+      const lead = mine - theirs;
+      pips.forEach((pip, i) => pip.classList.toggle("on", i < lead));
+      oppLine.textContent = NAMES[1 - p] + ": " + theirs;
+    }
+
+    function renderQuestion(m) {
+      hideMsg();
+      current = m;
+      answered = false;
+      questionEl.innerHTML = m.text + ' <span class="eq">=</span> ?';
+      buttons.forEach((b, i) => {
+        b.classList.remove("right", "wrong", "picked");
+        b.disabled = false;
+        b.querySelector(".val").textContent = m.options[i];
+        b.setAttribute("aria-label", "Answer " + m.options[i]);
+      });
+    }
+
+    function tap(i) {
+      keepAwake();
+      if (!current || answered || !conn || !conn.open) return;
+      answered = true;
+      buttons.forEach((b) => (b.disabled = true));
+      buttons[i].classList.add("picked");
+      try { conn.send({ t: "ans", id: current.id, i }); } catch (e) { answered = false; }
+    }
+
+    function onMsg(m) {
+      if (!m || !m.t) return;
+      switch (m.t) {
+        case "hello":
+          clearBoard();
+          showMsg("You're " + NAMES[p], "Look at the class screen. The game starts when your teacher presses Start.", color);
+          break;
+        case "lobby":
+          clearBoard();
+          showMsg("You're " + NAMES[p], "Waiting for the teacher to start the next game.", color);
+          break;
+        case "score":
+          renderScores(m.scores);
+          break;
+        case "ready":
+          clearBoard();
+          showMsg("Get ready…", "");
+          break;
+        case "countdown":
+          hideMsg();
+          clearBoard();
+          countdown(() => {});
+          break;
+        case "q":
+          renderQuestion(m);
+          break;
+        case "res":
+          if (m.ok) {
+            restartAnim(view, "flash-good");
+          } else {
+            buttons.forEach((b, j) => {
+              b.classList.remove("picked");
+              if (j === m.chosen) b.classList.add("wrong");
+              if (j === m.correct) b.classList.add("right");
+            });
+            restartAnim(view, "shake");
+            if (navigator.vibrate) navigator.vibrate(150);
+          }
+          break;
+        case "over":
+          clearBoard();
+          renderScores(m.scores);
+          if (m.winner === p) showMsg("You win! 🎉", "Final score " + m.scores[p] + " to " + m.scores[1 - p] + ".", color);
+          else showMsg(NAMES[m.winner] + " wins", "Final score " + m.scores[p] + " to " + m.scores[1 - p] + ". Good try!", m.winner === 0 ? "var(--p1)" : "var(--p2)");
+          break;
+        case "kicked":
+          kicked = true;
+          clearBoard();
+          showMsg("Another phone joined", "Someone else is now " + NAMES[p] + ". Scan the QR code again to take the spot back.");
+          break;
+      }
+    }
+
+    function scheduleRetry(ms) {
+      if (kicked) return;
+      clearTimeout(retryTimer);
+      retryTimer = setTimeout(openConn, ms);
+    }
+
+    function openConn() {
+      if (kicked || !peer || peer.destroyed) return;
+      if (peer.disconnected) { try { peer.reconnect(); } catch (e) { /* ignore */ } scheduleRetry(2000); return; }
+      if (conn) { try { conn.close(); } catch (e) { /* ignore */ } }
+      const c = peer.connect(ROOM_PREFIX + room, { metadata: { p }, reliable: true });
+      conn = c;
+      c.on("open", () => { clearTimeout(retryTimer); });
+      c.on("data", (m) => { if (conn === c) onMsg(m); });
+      c.on("close", () => {
+        if (conn !== c || kicked) return;
+        clearBoard();
+        showMsg("Reconnecting…", "Lost the connection to the class screen. Trying again.");
+        scheduleRetry(1500);
+      });
+      c.on("error", () => {});
+      // If nothing happens in time, try again.
+      setTimeout(() => { if (conn === c && !c.open) scheduleRetry(0); }, 8000);
+    }
+
+    function connect() {
+      if (!window.Peer) {
+        showMsg("Can't connect", "Couldn't load the connection library. Check the phone's internet connection and reload.");
+        return;
+      }
+      showMsg("Connecting…", "Joining as " + NAMES[p] + ".");
+      peer = new window.Peer();
+      peer.on("open", openConn);
+      peer.on("disconnected", () => { try { peer.reconnect(); } catch (e) { /* ignore */ } });
+      peer.on("error", (err) => {
+        if (kicked) return;
+        if (err.type === "peer-unavailable") {
+          showMsg("Looking for the game…", "Make sure the game is open on the class screen.");
+          scheduleRetry(2500);
+        } else if (["network", "server-error", "socket-error", "socket-closed"].includes(err.type)) {
+          showMsg("Reconnecting…", "Can't reach the connection server. Check the phone's internet connection.");
+          try { peer.destroy(); } catch (e) { /* ignore */ }
+          clearTimeout(retryTimer);
+          retryTimer = setTimeout(connect, 3000);
+        }
+      });
+    }
+
+    setInterval(() => {
+      if (conn && conn.open) { try { conn.send({ t: "ping" }); } catch (e) { /* ignore */ } }
+    }, HEARTBEAT_MS);
+
+    async function keepAwake() {
+      if (!("wakeLock" in navigator) || (wakeLock && !wakeLock.released)) return;
+      try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) { /* ignore */ }
+    }
+    document.addEventListener("pointerdown", keepAwake, { once: true });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible" || kicked) return;
+      keepAwake();
+      if (!conn || !conn.open) scheduleRetry(0);
+    });
+
+    clearBoard();
+    connect();
+  }
+})();
+</script>
+</body>
+</html>
