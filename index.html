@@ -371,7 +371,8 @@
   .qr img { width: 100%; height: auto; display: block; image-rendering: pixelated; }
   .slot.connected .qr { opacity: 0.25; }
   .status { font-weight: 600; color: var(--ink-soft); font-size: 0.95rem; }
-  .slot.connected .status { color: var(--good); }
+  .slot.connected .status { color: var(--ink-soft); }
+  .slot.ready .status { color: var(--good); }
   .joinlink {
     font-size: 0.72rem;
     color: var(--ink-soft);
@@ -424,6 +425,26 @@
   .opp { color: var(--ink-soft); font-size: 1rem; font-weight: 600; margin: -6px 0 0; }
   .phone-msg .winner { font-size: clamp(2.2rem, 11vw, 3.6rem); }
   .phone-msg .lede { margin-bottom: 0; }
+  .name-form { display: flex; flex-direction: column; gap: 14px; margin-top: 24px; }
+  .name-form[hidden] { display: none; }
+  .name-form label { font-weight: 600; color: var(--ink-soft); }
+  .name-form input {
+    font: inherit;
+    font-weight: 800;
+    font-size: 1.6rem;
+    text-align: center;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 3px solid var(--ink);
+    background: var(--btn);
+    color: var(--ink);
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .name-form input:focus-visible { outline: 3px solid var(--p1); outline-offset: 3px; }
+  .phone.p2 ~ .phone-msg .name-form input:focus-visible { outline-color: var(--p2); }
+  .change-name { margin-top: 20px; font-size: 1rem; padding: 10px 20px; }
+  .change-name[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -432,7 +453,7 @@
   <section class="panel p1" id="panel0" aria-label="Player 1">
     <div class="panel-inner">
       <div class="phead">
-        <span class="pname">Player 1<span class="tag"></span></span>
+        <span class="pname"><span class="pn">Player 1</span><span class="tag"></span></span>
         <span class="score" aria-live="polite">0</span>
       </div>
       <div class="pips" aria-hidden="true"></div>
@@ -443,7 +464,7 @@
   <section class="panel p2" id="panel1" aria-label="Player 2">
     <div class="panel-inner">
       <div class="phead">
-        <span class="pname">Player 2<span class="tag"></span></span>
+        <span class="pname"><span class="pn">Player 2</span><span class="tag"></span></span>
         <span class="score" aria-live="polite">0</span>
       </div>
       <div class="pips" aria-hidden="true"></div>
@@ -516,6 +537,12 @@
   <div class="card">
     <h2 class="winner" id="phoneMsgTitle">Connecting…</h2>
     <p class="lede" id="phoneMsgBody"></p>
+    <form class="name-form" id="nameForm" hidden autocomplete="off">
+      <label for="nameInput">Type your name</label>
+      <input id="nameInput" type="text" maxlength="16" autocapitalize="words" spellcheck="false" enterkeyhint="done" required>
+      <button class="btn" type="submit">I'm ready</button>
+    </form>
+    <button class="btn ghost change-name" id="changeNameBtn" type="button" hidden>Change name</button>
   </div>
 </div>
 
@@ -533,6 +560,8 @@
   const ROOM_PREFIX = "fiveahead-room-";
   const HEARTBEAT_MS = 2500;
   const OFFLINE_AFTER_MS = 8000;
+  const NAME_MAX = 16;
+  const cleanName = (v) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, NAME_MAX);
 
   const LEVEL_NOTES = {
     easy: "Adding and subtracting up to 20",
@@ -665,6 +694,8 @@
     };
     const conns = [null, null];
     const lastSeen = [0, 0];
+    const names = [null, null];   // set when a player types their name on their phone
+    const nameOf = (p) => names[p] || NAMES[p];
 
     const panels = [$("panel0"), $("panel1")];
     const ui = panels.map((panel, p) => ({
@@ -672,6 +703,7 @@
       score: panel.querySelector(".score"),
       question: panel.querySelector(".question"),
       tag: panel.querySelector(".tag"),
+      name: panel.querySelector(".pn"),
       pips: buildPips(panel.querySelector(".pips")),
       buttons: buildButtons(panel.querySelector(".choices"), p === 0 ? P1_KEYS : P2_KEYS, (i) => {
         if (state.mode === "local") answer(p, i);
@@ -680,12 +712,13 @@
 
     // ---------- Messaging ----------
     function send(p, msg) {
-      if (state.mode !== "remote" && msg.t !== "hello" && msg.t !== "lobby") return;
+      if (state.mode !== "remote" && msg.t !== "hello" && msg.t !== "lobby" && msg.t !== "names") return;
       const c = conns[p];
       if (!c || !c.open) return;
       try { c.send(msg); } catch (e) { /* ignore */ }
     }
     const sendAll = (msg) => { send(0, msg); send(1, msg); };
+    const namesMsg = () => ({ t: "names", names: [nameOf(0), nameOf(1)] });
     const scoreMsg = () => ({ t: "score", scores: state.scores.slice() });
     const qMsg = (p) => {
       const q = state.questions[p];
@@ -696,23 +729,33 @@
       return !!(conns[p] && conns[p].open && Date.now() - lastSeen[p] < OFFLINE_AFTER_MS);
     }
 
+    const isReady = (p) => isOnline(p) && !!names[p];
+
     function refreshPresence() {
       [0, 1].forEach((p) => {
         const on = isOnline(p);
+        const ready = isReady(p);
         const slot = $("slot" + p);
         slot.classList.toggle("connected", on);
-        slot.querySelector(".status").textContent = on ? "✓ Phone connected" : "Scan with a phone";
+        slot.classList.toggle("ready", ready);
+        slot.querySelector("h3").textContent = nameOf(p);
+        slot.querySelector(".status").textContent =
+          ready ? "✓ Ready" : on ? "Phone connected, typing name…" : "Scan with a phone";
+        ui[p].name.textContent = state.mode === "remote" ? nameOf(p) : NAMES[p];
         ui[p].tag.textContent = on ? "● phone" : "○ phone offline";
         ui[p].tag.className = "tag " + (on ? "on" : "off");
       });
-      const both = isOnline(0) && isOnline(1);
+      const both = isReady(0) && isReady(1);
       $("startBtn").disabled = !both;
-      $("startNote").textContent = both ? "Both players are in. Ready!" : "Waiting for both players to scan";
+      $("startNote").textContent = both ? "Both players are ready!"
+        : isOnline(0) && isOnline(1) ? "Waiting for both players to type their name"
+        : "Waiting for both players to scan and type their name";
     }
     setInterval(refreshPresence, 1000);
 
     function syncPlayer(p) {
-      send(p, { t: "hello", p });
+      send(p, { t: "hello", p, phase: state.mode === "remote" ? state.phase : "lobby" });
+      send(p, namesMsg());
       if (state.mode !== "remote") return;
       send(p, scoreMsg());
       if (state.phase === "play" && !state.locked[p] && state.questions[p]) send(p, qMsg(p));
@@ -726,6 +769,7 @@
         const old = conns[p];
         conns[p] = conn;
         lastSeen[p] = Date.now();
+        names[p] = null;   // the phone sends its name again (automatically if it already had one)
         if (old && old !== conn) {
           try { old.send({ t: "kicked" }); } catch (e) { /* ignore */ }
           setTimeout(() => { try { old.close(); } catch (e) { /* ignore */ } }, 300);
@@ -737,6 +781,12 @@
         if (conns[p] !== conn || !m) return;
         lastSeen[p] = Date.now();
         if (m.t === "ans" && state.mode === "remote") answer(p, m.i, m.id);
+        else if (m.t === "name") {
+          const n = cleanName(m.name);
+          names[p] = n || null;
+          refreshPresence();
+          sendAll(namesMsg());
+        }
       });
       conn.on("close", () => {
         if (conns[p] === conn) { conns[p] = null; refreshPresence(); }
@@ -763,8 +813,10 @@
           const qr = window.qrcode(0, "M");
           qr.addData(url);
           qr.make();
-          slot.querySelector(".qr").innerHTML =
-            '<img alt="QR code to join as ' + NAMES[p] + '" src="' + qr.createDataURL(6, 2) + '">';
+          const img = document.createElement("img");
+          img.alt = "QR code to join as " + NAMES[p];
+          img.src = qr.createDataURL(6, 2);
+          slot.querySelector(".qr").replaceChildren(img);
         }
       });
     }
@@ -879,7 +931,7 @@
       state.overMsg = { t: "over", winner: w, scores: state.scores.slice() };
       sendAll(state.overMsg);
       const winnerText = $("winnerText");
-      winnerText.textContent = NAMES[w] + " wins";
+      winnerText.textContent = (state.mode === "remote" ? nameOf(w) : NAMES[w]) + " wins";
       winnerText.style.color = w === 0 ? "var(--p1)" : "var(--p2)";
       $("finalScore").textContent = "Final score " + state.scores[0] + " to " + state.scores[1];
       ui.forEach((u) => u.buttons.forEach((b) => (b.disabled = true)));
@@ -893,6 +945,7 @@
     function startGame(mode) {
       if (mode) state.mode = mode;
       document.body.classList.toggle("remote", state.mode === "remote");
+      refreshPresence();
       state.scores = [0, 0];
       state.questions = [null, null];
       state.locked = [false, false];
@@ -977,14 +1030,56 @@
     let answered = true;
     let retryTimer = null;
     let wakeLock = null;
+    let myName = cleanName(storageGet("fiveahead-name"));
+    let confirmed = false;   // has this phone sent its name since loading?
+    let names = NAMES.slice();
+    let waitBody = "";
+
+    const nameForm = $("nameForm");
+    const nameInput = $("nameInput");
+    const changeBtn = $("changeNameBtn");
+    nameInput.maxLength = NAME_MAX;
 
     function showMsg(title, body, titleColor) {
       $("phoneMsgTitle").textContent = title;
       $("phoneMsgTitle").style.color = titleColor || "";
       $("phoneMsgBody").textContent = body || "";
+      nameForm.hidden = true;
+      changeBtn.hidden = true;
       msgEl.hidden = false;
     }
     const hideMsg = () => { msgEl.hidden = true; };
+
+    function askName() {
+      showMsg("You're " + NAMES[p], "Type your name so the class knows who is playing.", color);
+      nameInput.value = myName;
+      nameForm.hidden = false;
+      setTimeout(() => nameInput.focus(), 50);
+    }
+
+    function showWaiting() {
+      showMsg("Hi " + myName + "!", waitBody, color);
+      changeBtn.hidden = false;
+    }
+
+    function sendName() {
+      if (!conn || !conn.open || !myName) return false;
+      try { conn.send({ t: "name", name: myName }); return true; } catch (e) { return false; }
+    }
+
+    nameForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      keepAwake();
+      const n = cleanName(nameInput.value);
+      if (!n) { nameInput.focus(); return; }
+      myName = n;
+      storageSet("fiveahead-name", n);
+      if (!sendName()) return;
+      confirmed = true;
+      nameInput.blur();
+      showWaiting();
+    });
+    changeBtn.addEventListener("click", askName);
 
     function clearBoard() {
       current = null;
@@ -997,13 +1092,15 @@
       });
     }
 
+    let lastScores = null;
     function renderScores(scores) {
+      lastScores = scores;
       const mine = scores[p], theirs = scores[1 - p];
       if (Number(scoreEl.textContent) !== mine) restartAnim(scoreEl, "bump");
       scoreEl.textContent = mine;
       const lead = mine - theirs;
       pips.forEach((pip, i) => pip.classList.toggle("on", i < lead));
-      oppLine.textContent = NAMES[1 - p] + ": " + theirs;
+      oppLine.textContent = names[1 - p] + ": " + theirs;
     }
 
     function renderQuestion(m) {
@@ -1033,11 +1130,18 @@
       switch (m.t) {
         case "hello":
           clearBoard();
-          showMsg("You're " + NAMES[p], "Look at the class screen. The game starts when your teacher presses Start.", color);
+          waitBody = "Look at the class screen. The game starts when your teacher presses Start.";
+          if (confirmed && sendName()) { if (m.phase === "lobby" || !m.phase) showWaiting(); }
+          else askName();
           break;
         case "lobby":
           clearBoard();
-          showMsg("You're " + NAMES[p], "Waiting for the teacher to start the next game.", color);
+          waitBody = "Waiting for the teacher to start the next game.";
+          if (confirmed) showWaiting(); else askName();
+          break;
+        case "names":
+          if (Array.isArray(m.names)) names = [0, 1].map((i) => cleanName(m.names[i]) || NAMES[i]);
+          if (lastScores) renderScores(lastScores);
           break;
         case "score":
           renderScores(m.scores);
@@ -1071,7 +1175,7 @@
           clearBoard();
           renderScores(m.scores);
           if (m.winner === p) showMsg("You win! 🎉", "Final score " + m.scores[p] + " to " + m.scores[1 - p] + ".", color);
-          else showMsg(NAMES[m.winner] + " wins", "Final score " + m.scores[p] + " to " + m.scores[1 - p] + ". Good try!", m.winner === 0 ? "var(--p1)" : "var(--p2)");
+          else showMsg(names[m.winner] + " wins", "Final score " + m.scores[p] + " to " + m.scores[1 - p] + ". Good try!", m.winner === 0 ? "var(--p1)" : "var(--p2)");
           break;
         case "kicked":
           kicked = true;
